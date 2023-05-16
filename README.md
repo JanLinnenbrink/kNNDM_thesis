@@ -1,4 +1,4 @@
-﻿# kNNDM: k-fold Nearest Neighbour Distance Matching Cross-Validation for map accuracy estimation
+﻿# Development of a new spatial cross-validation strategy and its application for machine learning based modelling of ecological data
 
 This repository contains the R-scripts used in the master thesis "Development of a new spatial cross-validation strategy and its application for machine learning based modelling of ecological data" by Jan Linnenbrink. The thesis is partly based on "kNNDM: k-fold Nearest Neighbour Distance Matching Cross-Validation for map accuracy estimation" by Jan Linnenbrink, Carles Milà, Marvin Ludwig and Hanna Meyer. The manuscript has been submitted to the journal *Geoscientific Model Development*.
 
