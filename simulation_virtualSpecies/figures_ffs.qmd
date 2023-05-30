@@ -19,10 +19,7 @@ library(dplyr)
 library(tidyr)
 library(forcats)
 
-sim_files <- list.files("results/", pattern = "^ffs", full.names = TRUE) |> 
-  lapply(read.csv)
-sim_res <- do.call(rbind.data.frame, sim_files)
-
+sim_res <- read.csv("results/ffs.csv")
 sim_diff <- data.frame(rmse_rand=sim_res$diff_CV_AOI_RMSE_rand,
                        rmse_spat=sim_res$diff_CV_AOI_RMSE_spat,
                        rmse_nndm=sim_res$diff_CV_AOI_RMSE_nndm,

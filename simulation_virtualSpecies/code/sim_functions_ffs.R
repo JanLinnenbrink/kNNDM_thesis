@@ -1,5 +1,4 @@
 # Libraries and utils ----
-#.libPaths("/home/j/jlinnenb/r_packages/")
 library("tidyverse")
 library("raster")
 library("terra")
@@ -12,7 +11,6 @@ library("parallel")
 library("doParallel")
 library("pbapply")
 source("./code/sim_utils.R")
-#source("~/kNNDM_paper/code/sim_utils.R")
 
 # No need for proj4 warnings
 options("rgdal_show_exportToProj4_warnings"="none")

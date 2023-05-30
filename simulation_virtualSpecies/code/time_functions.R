@@ -10,7 +10,6 @@ library("virtualspecies")
 library("parallel")
 library("doParallel")
 library("pbapply")
-#setwd("~/kNNDM_paper/")
 source("code/sim_utils.R")
 
 # No need for proj4 warnings
@@ -101,9 +100,10 @@ fitval_rf_species <- function(form,
 #' @param sampling_area sf or sfc polygon object. Sampling area.
 #' @param sample_dist String or vector or string. Distribution of the sampling
 #' points. 5 are possible: "sregular", "wregular", "random", "wclust","sclust".
+#' @param interval vector or integer. The number of training points that should
+#' be analyzed divided by 100. Between 1 and 50, by default 1:50 (i.e., 100 to 5000 training points).
 sim_species <- function(rgrid, rstack, sampling_area,
-                        sample_dist=c("random", "sclust"),
-                        ncores=10){
+                        sample_dist=c("random", "sclust"), interval=1:50){
   
   
   # sample prediction points from the prediction area
@@ -118,11 +118,10 @@ sim_species <- function(rgrid, rstack, sampling_area,
   
   # Simulate sampling points according to parameters and constraints
   tr_pts <- as.integer(seq(100, 5000, length.out=50))
-  
-  cl <- makeCluster(ncores)
-  registerDoParallel(cl)
-  
-  res <- pblapply(tr_pts, function(n_tpoints) {
+
+  tr_pts <- tr_pts[interval]
+ 
+  res <- lapply(tr_pts, function(n_tpoints) {
     message(paste0("n training points: ", n_tpoints))
     train_points <- sim2_samples(n_tpoints, sample_dist, sampling_area) |> st_transform(st_crs(ppoints))
     
@@ -159,7 +158,7 @@ sim_species <- function(rgrid, rstack, sampling_area,
     res_i <- bind_rows(res, res_it)
   }
   )
-  stopCluster(cl)
+  
   rm("cl")
   
   res <- do.call(rbind, res)
