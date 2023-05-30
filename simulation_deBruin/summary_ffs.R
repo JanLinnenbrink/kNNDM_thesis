@@ -11,6 +11,16 @@ t <- do.call(rbind,list.files("CVresults/ffs_knndm/", full.names = TRUE) |>
 tr <- do.call(rbind,list.files("CVresults/ffs_rand/", full.names = TRUE) |> 
                 lapply(read.csv))
 
+t1 <- do.call(rbind,list.files("CVresults/ffs_knndm/", full.names = TRUE) |> 
+                lapply(read.csv)) |> 
+  mutate(design = case_when(smpl == "regular" ~ "syst",
+                            smpl == "simpleRandom" ~ "SRS",
+                            smpl == "clusterMedium" ~ "clustMed",
+                            smpl == "clusterStrong" ~ "clustStr",
+                            smpl == "clusterGapped" ~ "clustGap"),
+         design = as.factor(design),
+         design = fct_relevel(design, c("SRS", "syst", "clustMed","clustStr","clustGap")))
+
 
 t$CV <- "knndm"
 tr$CV <- "random"
@@ -89,3 +99,29 @@ names(tr)
     theme_bw() +
     theme(legend.position = "right",
           axis.text = element_text(size=8)))
+
+
+
+lm_rmse <- lm(abs(RMSE_diff)~W, t1)
+r2_rmse <- round(summary(lm_rmse)$r.squared,2)
+
+(W_smpl <- ggplot(t1) +
+  geom_boxplot(aes(x=W, y=design), alpha=0.5) +
+    xlab("W") + ylab("") +
+  theme_bw(base_size=12)   +
+    theme(legend.position = c(0.8,0.8),
+          aspect.ratio = 1,
+          plot.margin = unit(rep(0.5,4), "cm")))
+
+
+(W_RMSE <- ggplot(data=t1, aes(x=W,y=abs(RMSE_diff))) +
+  geom_point(shape=1) +
+  geom_smooth(col="black", linewidth=0.8, se = FALSE, method = "lm") +
+  ylab(expression(abs(CV - true~RMSE))) +
+  xlab("W") +
+  theme_bw(base_size=12) +
+  theme(aspect.ratio = 1,
+        axis.title.y = element_text(margin = margin(t = 0, r = -45, b = 0, l = 0))))
+
+(W_pl <- cowplot::plot_grid(W_smpl, W_RMSE, align="vh", labels=c("a)", "b)")))
+ggsave("material/W_plot.pdf", W_pl, width=6.5, height = 3)
