@@ -397,10 +397,7 @@ library("dplyr")
 library("forcats")
 library("tidyr")
 
-sims <- rbind(sims_rand, sims_sclust)
-
-
-time_res <- read.csv("results/time_res.csv") |> 
+time_res <- read.csv("results/time_res_rand.csv") |> 
   mutate(distr = case_when(dsample == "sregular" ~ "Strong\nregular",
                                      dsample == "wregular" ~ "Weak\nregular",
                                      dsample == "random" ~ "Random",
@@ -451,60 +448,6 @@ ggsave("figures/5_time.pdf", tp, height=3, width=6)
 
 ```
 
-```{r figure appendix, fig.width=8.5,fig.height=3.5, message=FALSE}
-
-library("ggplot2")
-library("dplyr")
-library("forcats")
-library("tidyr")
-
-
-time_res <- read.csv("results/time_res.csv") |> 
-  mutate(distr = case_when(dsample == "sregular" ~ "Strong\nregular",
-                                     dsample == "wregular" ~ "Weak\nregular",
-                                     dsample == "random" ~ "Random",
-                                     dsample == "wclust" ~ "Weak\nclustered",
-                                     dsample == "sclust" ~ "Strong\nclustered"),
-         distr = as.factor(distr),
-         distr = fct_relevel(distr, c("Strong\nregular", "Weak\nregular", "Random",
-                                   "Weak\nclustered", "Strong\nclustered")))
-
-sim_stats_extended <- time_res |> 
-  dplyr::select(-dsample) |> 
-  mutate(knndm_total = time_kndm_alg + time_kndm_mod,
-         nndm_total = time_nndm_alg + time_nndm_mod) |> 
-  group_by(n_tpoints, distr) |> 
-  summarise(mean_knndm = mean(knndm_total, na.rm=TRUE),
-            mean_nndm = mean(nndm_total, na.rm=TRUE),
-            sd_knndm = sd(knndm_total, na.rm=TRUE),
-            sd_nndm = sd(nndm_total, na.rm=TRUE),
-            min_knndm = min(knndm_total, na.rm=TRUE),
-            max_knndm = max(knndm_total, na.rm=TRUE),
-            min_nndm = min(nndm_total, na.rm=TRUE),
-            max_nndm = max(nndm_total, na.rm=TRUE))
-
-tp_ext <- ggplot(sim_stats_extended) +
-  geom_errorbar(aes(x=n_tpoints+10, ymin=mean_knndm-sd_knndm, ymax=mean_knndm+sd_knndm),
-                width=10, size=0.4) +
-  geom_point(aes(x=n_tpoints+10,y=mean_knndm, fill="kNNDM CV"), colour="black",
-             pch=21, size=1.8) +
-  geom_errorbar(aes(x=n_tpoints-10,ymin=mean_nndm-sd_nndm, ymax=mean_nndm+sd_nndm),
-                width=10, size=0.4) +
-  geom_point(aes(x=n_tpoints-10, y=mean_nndm, fill="NNDM LOOCV"), colour="black",
-             pch=21, size=1.8) +
-  scale_x_continuous(breaks=seq(100, 1000, length.out=3),
-                     minor_breaks = NULL) +
-  ylab("time [s]") + xlab("n training points") +
-  theme_bw(base_size = 12) +
-  theme(legend.title = element_blank(),
-        legend.position = "bottom") +
-  facet_wrap(~distr, nrow=1)
-tp_ext
-
-ggsave("figures/time_appendix.pdf", tp_ext, height=3.2, width=8.5)
-```
-
-
 ```{r figure appendix 2, fig.width=8.5,fig.height=6, message=FALSE}
 
 library("ggplot2")
@@ -513,61 +456,49 @@ library("forcats")
 library("tidyr")
 
 
-time_res <- read.csv("results/time_res_new.csv") |> 
+time_res <- lapply(Sys.glob("results/time_res_sclust*.csv"), read.csv) |> 
+  bind_rows() |> 
+  rbind(read.csv("results/time_res_rand.csv")) |> 
   mutate(distr = case_when(dsample == "random" ~ "Random", dsample == "sclust" ~ "Strong\nclustered"),
          distr = as.factor(distr),
          distr = fct_relevel(distr, c("Random", "Strong\nclustered")))
 
+names(time_res) <- c("dsample", "knndm_time_model", "nndm_time_model", "knndm_time_algorithm", "nndm_time_algorithm", "n_tpoints", "distr")
+
+
+# something went wrong with n=100 for random sample distribution
+time_res[time_res$dsample=="random"&time_res$n_tpoints==100,]
+
 t <- time_res |> 
   dplyr::select(-dsample) |> 
-  mutate(knndm_total = time_kndm_alg + time_kndm_mod,
-         nndm_total = time_nndm_alg + time_nndm_mod) |> 
+  mutate(knndm_total = knndm_time_algorithm + knndm_time_model,
+         nndm_total = nndm_time_algorithm + nndm_time_model) |> 
   group_by(n_tpoints, distr) |> 
-  summarise(mean_knndm_total = mean(knndm_total, na.rm=TRUE),
-            mean_nndm_total = mean(nndm_total, na.rm=TRUE),
-            mean_knndm_model = mean(time_kndm_mod, na.rm=TRUE),
-            mean_nndm_model = mean(time_nndm_mod, na.rm=TRUE),
-            mean_knndm_algorithm = mean(time_kndm_alg, na.rm=TRUE),
-            mean_nndm_algorithm = mean(time_nndm_alg, na.rm=TRUE),
-            standard_deviation_knndm_total = sd(knndm_total, na.rm=TRUE),
-            standard_deviation_nndm_total = sd(nndm_total, na.rm=TRUE),
-            standard_deviation_knndm_model = sd(time_kndm_mod, na.rm=TRUE),
-            standard_deviation_nndm_model = sd(time_nndm_mod, na.rm=TRUE),
-            standard_deviation_knndm_algorithm = sd(time_kndm_alg, na.rm=TRUE),
-            standard_deviation_nndm_algorithm = sd(time_nndm_alg, na.rm=TRUE)) |> 
-  pivot_longer(!c(n_tpoints, distr))|> 
-  mutate(stat=ifelse(grepl("standard_deviation", name), "standard_deviation", "mean")) |> 
-  ungroup() |> 
-  tidyr::nest(.by=stat) 
+  pivot_longer(!c(n_tpoints, distr)) |> 
+  ungroup()
 
-names(t$data[[1]])[[4]] <- "mean"
-names(t$data[[2]])[[4]] <- "sd"
+t$what <- sub(pattern = ".*_", "", x = t$name)
+t$type <- sub(pattern = "\\_.*", "", x = t$name)
 
-td <- t$data[[1]]
-td$sd <- t$data[[2]]$sd
-  
-sim_stats_extended <- td |>  
-  mutate(CV_method=ifelse(grepl("knndm", name), "kNNDM", "NNDM"),
-         what=sub(".*_", "", name)) |> 
-  dplyr::select(-name)
 
-tp_ext <- ggplot(sim_stats_extended, aes(x=n_tpoints, group=CV_method)) +
-  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd),
-                width=10, size=0.4, position = position_dodge(width=100)) +
-  geom_point(aes(y=mean, fill=CV_method), colour="black", pch=21, size=1.8,
-             position = position_dodge(100)) +
-  scale_x_continuous(breaks=seq(100, 1000, length.out=3),
-                     minor_breaks = NULL) +
-  ylab("time [s]") + xlab("n training points") +
-  theme_bw(base_size = 12) +
-  theme(legend.title = element_blank(),
-        legend.position = "bottom") +
-  facet_grid(what~distr)
+tp_ext <- ggplot(t, aes(x=n_tpoints, y=value, colour=type, group=what)) +
+  geom_point() +
+  facet_grid(distr~what,scales="free_y") +
+  scale_colour_discrete(name="", labels=c("kNNDM", "NNDM")) +
+  scale_x_continuous(limits=c(0,5000), breaks=c(0,2500,5000)) +
+  scale_y_log10() +
+  xlab("n training points") +
+  ylab("time [s]") +
+  theme_bw(base_size=15) +
+  theme(legend.position = "bottom")
+
+
 tp_ext
 
-ggsave("figures/time_appendix2.pdf", tp_ext, height=6, width=8.5)
+t[t$distr=="Strong\nclustered" & t$n_tpoints>1000&t$name=="nndm_time_algorithm",]
+t[t$distr=="Random" & t$n_tpoints<1000&t$name=="knndm_time_model",]
 
-sim_stats_extended[sim_stats_extended$n_tpoints==1000 & sim_stats_extended$distr=="Strong\nclustered" & sim_stats_extended$what=="total" & sim_stats_extended$CV_method=="NNDM", "mean"][[1]] / 
-sim_stats_extended[sim_stats_extended$n_tpoints==1000 & sim_stats_extended$distr=="Strong\nclustered" & sim_stats_extended$what=="total" & sim_stats_extended$CV_method=="kNNDM", "mean"][[1]]
+ggsave("figures/time_analysis.pdf", tp_ext, height=6, width=8.5)
+
 
 ```
