@@ -12,7 +12,7 @@ The repository is structured as follows:
 	* [figures](simulation_virtualSpecies/figures/): contains the figures.
 
 * [simulation_deBruin](simulation_deBruin/): This folder contains the code to reproduce the second simulation.
-	* [summary.R](simulation_virtualSpecies/summary.R): The R-Script to generate the figures of simulation
+	* [figures_sim2.qmd](simulation_virtualSpecies/igures_sim2.qmd): The R-Quarto-Script to generate the figures of simulation 2
 	* [R](simulation_deBruin/R/): contains the R-scripts to run the deBruin simulations.
 	* [material](simulation_deBruin/material/): contains the resulting tables and figures.
 
