@@ -1,0 +1,205 @@
+---
+title: "Results of simulation 2: above-ground biomass and soil organic carbon stock"
+format: pdf
+fig-align: center
+date: today
+date-format: iso
+author: Jan Linnenbrink
+editor_options: 
+  chunk_output_type: inline
+---
+
+This file contains the code to reproduce the figures of section three of the master thesis "Development of a new spatial cross-validation strategy and its application for machine learning based modelling of ecological data" by Jan Linnenbrink
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+knitr::opts_chunk$set(warning=FALSE)
+knitr::opts_chunk$set(message=FALSE)
+```
+
+```{r}
+
+infolder  <- "./CVresults/"
+outfolder <- "./material"
+mets <- c("exhaustive_old", "random", "spatial", "intensity", "knndm","nndm")
+colnms <- c("method", "variate", "design", "number", "RMSE")
+outtab <- data.frame(matrix(NA, 0, 5))
+names(outtab) <- colnms
+
+for(m in mets){
+  p <- file.path(infolder, m)
+  f_ins <- list.files(p, glob2rx("???_*.Rdata"))
+  for(f_in in f_ins){
+    lchar <- nchar(f_in)
+    variate <- substr(f_in, 1, 3)
+    design <- substr(f_in, 5, lchar-9)
+    number <- as.numeric(substr(f_in, lchar-8, lchar-6))
+    load(file.path(p, f_in))
+    RMSE   <- mean(RMSE)
+      
+    newrow <- data.frame(method = m, variate = variate, design = design,
+                         number = number, RMSE = RMSE)
+    outtab <- rbind(outtab, newrow)
+  }
+}
+
+write.csv(outtab, file.path(outfolder, "outtab100.csv"))
+
+
+outtab <- read.csv(file.path(outfolder, "outtab100.csv"))
+outtab$methodID <- with(outtab, ifelse(method=="exhaustive_old",0,1))
+                                       
+                                       
+# relative RMSE & MEC
+outtab$rRMSE <- NA
+
+
+numbers=1:100
+#86,88,93 for OCS
+ 
+
+for(variate in c("AGB", "OCS")){
+  for(design in unique(outtab$design)){
+    for(number in numbers){
+      idx1 <- which(outtab$design == design & outtab$variate == variate & 
+                      outtab$number == number)
+      idx2 <- which(outtab$design == design & outtab$variate == variate & 
+                      outtab$methodID == 0 & outtab$number == number)
+      
+      outtab$rRMSE[idx1] <- 100 * (outtab$RMSE[idx1] - outtab$RMSE[idx2])/
+        outtab$RMSE[idx2]
+    }
+  }
+}
+
+outtab$method <- factor(outtab$method, levels=c("exhaustive_old", "random", "spatial", "intensity", "knndm","nndm"))
+outtab$design <- factor(outtab$design, levels=c("simpleRandom", "regular", "clusterMedium", 
+                                                "clusterStrong", "clusterGapped"))
+outtab$variate <- as.factor(outtab$variate)
+
+
+```
+
+## Comparison of the performance of different CV methods
+
+The performance of the different CV methods measured as the percentual deviation of the CV estimated error to the true error. The two different prediction scenarios AGB (above ground biomass) and OCS (organic carbon stock) are shown in two different rows. The different sampling designs, ranging from simple random sampling (SRS) over regular (syst), medium clustered (clustMed), strong clustered (clustStrong) to gapped clustered (clustGap), are shown at the x-axis, while different CV methods are indicated by colours. Note that k=10 for all CV methods but NNDM, where k=N. 
+
+```{r}
+
+#| fig-align: center
+#| fig-width: 5
+
+library(ggplot2)
+library(ggthemes)
+
+xlabs <- c("conventional", "spatial", "intensity", "kNNDM", "NNDM")
+filllabs <- c("random", "spatial", "intensity", "kNNDM", "NNDM")
+collabs <- c("SRS","syst","clustMed","clustStr","clustGap")
+cols <- c("white", "brown", "pink", "orange", "lightgreen")
+
+lw <- 0.6
+w <- 0.45
+(diff_RMSE <- ggplot(outtab[outtab$methodID!=0,], aes(x=design, y=rRMSE, colour=method)) +
+    geom_boxplot(lwd=lw, width=w,position=position_dodge(0.6)) +
+    geom_hline(yintercept = 0, linetype="solid", alpha=0.6) +
+    scale_colour_colorblind(name="CV method", labels=filllabs) +
+    scale_x_discrete(labels=collabs) +
+    ylab("relative RMSE [%]") + 
+    xlab("") +
+    scale_y_continuous(limits=c(-60,60), breaks=seq(-60,60,20)) +
+    facet_wrap(.~variate, nrow =2) +
+    theme_bw() +
+    theme(legend.position = "bottom"))
+
+ggsave("material/RMSE_comparison.pdf", diff_RMSE, height = unit(5.5, "cm"), width=unit(6, "cm"))
+
+```
+
+
+## CV error estimates when AOA is taken into account
+
+a) shows the performance of the different CV methods when the area of applicability (AOA, Meyer & Pebesma (2021)) is taken into account. The different colours indicate if the true RMSE was calculated for the whole area, or if cells outside the AOA were masked out. b) shows the percentage of grid cells that are inside the AOA. Colours indicate the different algorithms used. The two different prediction scenarios AGB (above ground biomass) and OCS (organic carbon stock) are shown in two different columns. The different sampling designs range from simple random sampling (SRS) over regular (syst), medium clustered (clustMed), strong clustered (clustStrong) to gapped clustered (clustGap) and are shown at the x-axis.
+
+```{r}
+
+#| fig-height: 8
+
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(forcats)
+
+
+t2 <- do.call(rbind,list.files("CVresults/knndm_rand_AOA/", full.names = TRUE) |> 
+                lapply(read.csv)) |>
+  as_tibble() |> 
+  dplyr::select(-c(1:2)) |> 
+  dplyr::select(-starts_with("true")) |> 
+  dplyr::select(-contains("cAOA")) |> 
+  dplyr::select(-starts_with("CV_RMSE")) |> 
+  pivot_longer(-c(1:2)) |> 
+  mutate(CV = case_when(grepl("rand", name) ~ "random",
+                        grepl("knndm", name) ~"kNNDM"),
+         design = case_when(smpl == "regular" ~ "syst",
+                            smpl == "simpleRandom" ~ "SRS",
+                            smpl == "clusterMedium" ~ "clustMed",
+                            smpl == "clusterStrong" ~ "clustStr",
+                            smpl == "clusterGapped" ~ "clustGap"),
+         design = as.factor(design),
+         design = fct_relevel(design, c("SRS", "syst", "clustMed","clustStr","clustGap")),
+         AOA = ifelse(grepl("inAOA", name), "inAOA", "inAOI"),
+         AOA = as.factor(AOA),
+         AOA = fct_relevel(AOA, "inAOI", "inAOA"))
+
+diff_RMSE <- ggplot(t2[startsWith(t2$name, "diff"),], aes(x=design, fill=AOA)) +
+    geom_boxplot(aes(y=value), width=0.45, position = position_dodge(.65)) +
+    geom_hline(yintercept = 0, linetype="solid", alpha=0.6) +
+    scale_fill_discrete(name="", labels = c("whole AOI", "inside AOA")) +
+    ylab("relative RMSE [%]") + 
+    xlab("") +
+    scale_y_continuous(limits=c(-60,60), breaks=seq(-60,60,20)) +
+    facet_grid(CV~variate) +
+    theme_bw() +
+    theme(legend.position = "right",
+          axis.text = element_text(size=8))
+
+diff_AOA <- ggplot(t2[startsWith(t2$name, "inAOA"),], aes(x=design, fill=CV)) +
+    geom_boxplot(aes(y=value), width=0.45, position = position_dodge(.65)) +
+    geom_hline(yintercept = 100, linetype="solid", alpha=0.6) +
+    scale_y_continuous(limits = c(0,100)) +
+    scale_fill_discrete(name="", labels=c("kNNDM", "random")) +
+    facet_grid(""~variate) +
+    ylab("cells inside AOA [%]") + 
+    xlab("") +
+    theme_bw()+ 
+    theme(legend.position = "right",
+          axis.text = element_text(size=8),
+          strip.background.y = element_blank() )
+
+(pl <- cowplot::plot_grid(diff_RMSE, diff_AOA, nrow = 2, rel_heights = c(1,0.6),
+                         align = "v", labels = c("a)", "b)")))
+
+
+#ggsave("material/rmse_aoa_db.pdf", pl, width=7, height = 6.5)
+```
+
+
+## W stat and association with error
+
+a) shows the performance of the different CV methods when the area of applicability (AOA, Meyer & Pebesma (2021)) is taken into account. The different colours indicate if the true RMSE was calculated for the whole area, or if cells outside the AOA were masked out. b) shows the percentage of grid cells that are inside the AOA. Colours indicate the different algorithms used. The two different prediction scenarios AGB (above ground biomass) and OCS (organic carbon stock) are shown in two different columns. The different sampling designs range from simple random sampling (SRS) over regular (syst), medium clustered (clustMed), strong clustered (clustStrong) to gapped clustered (clustGap) and are shown at the x-axis.
+
+```{r}
+
+W_smpl <- ggplot(t2[startsWith(t2$name, "W") & t2$CV == "kNNDM",]) +
+    geom_boxplot(aes(x=value, y=design), alpha=0.5) +
+    xlab("W") + ylab("") +
+    theme_bw(base_size=12)   +
+    theme(legend.position = c(0.8,0.8),
+          aspect.ratio = 1,
+          plot.margin = unit(rep(0.5,4), "cm"))
+
+#ggsave("material/W_plot.pdf", W_smpl, width=4.5, height = 3)
+```
+
+
